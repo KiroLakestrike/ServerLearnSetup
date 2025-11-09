@@ -6,76 +6,102 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+
+	"github.com/KiroLakestrike/bedAndBreakfast/pkg/config"
+	"github.com/KiroLakestrike/bedAndBreakfast/pkg/models"
 )
 
-func RenderTemplate(w http.ResponseWriter, tmpl string) {
-	// Create a template cache (load and parse all templates)
-	tc, err := createTemplateCache()
-	if err != nil {
-		log.Fatal(err)
-	}
+var app *config.AppConfig
 
-	// Retrieve the requested template from the cache
+// NewTemplates sets the config for the template package
+func NewTemplates(a *config.AppConfig) {
+	app = a
+}
+
+// AddDefaultData adds default data to the template data struct before rendering
+func AddDefaultData(td *models.TemplateData) *models.TemplateData {
+	// Currently just returns the passed data without modification
+	return td
+}
+
+// RenderTemplate renders templates using html/template and writes output to http.ResponseWriter
+func RenderTemplate(w http.ResponseWriter, tmpl string, td *models.TemplateData) {
+	var tc map[string]*template.Template
+	// Get the template cache from AppConfig depending on whether caching is enabled
+	if app.UseCache {
+		tc = app.TemplateCache
+	} else {
+		// Create a template cache on the fly if caching is disabled
+		tc, _ = CreateTemplateCache()
+	}
+	// Retrieve the specified template from the cache by name
 	t, ok := tc[tmpl]
 	if !ok {
-		log.Fatal(err) // Stop program if template not found
+		// Log fatal error and stop execution if template not found in cache
+		log.Fatal("Could not get template from template cache")
 	}
 
-	// Create a buffer to temporarily hold the rendered output
+	// Create a buffer to temporarily hold the executed template output
 	buf := new(bytes.Buffer)
 
-	// Execute the template, passing nil as data context
-	err = t.Execute(buf, nil)
+	// Add any default data to the template data
+	td = AddDefaultData(td)
+	// Execute the template with the provided data, writing output to the buffer
+	err := t.Execute(buf, td)
+
 	if err != nil {
+		// Log any error encountered during template execution
 		log.Println(err)
 	}
 
-	// Write the rendered template content to the HTTP response
+	// Write the rendered content from buffer to the HTTP response
 	_, err = buf.WriteTo(w)
 	if err != nil {
+		// Log any error encountered during writing to response
 		log.Println(err)
 	}
 }
 
-func createTemplateCache() (map[string]*template.Template, error) {
-	// Create a map to store compiled templates by name
+// CreateTemplateCache compiles templates from files and caches them in a map
+func CreateTemplateCache() (map[string]*template.Template, error) {
+	// Initialize a map to hold compiled templates with template file names as keys
 	myCache := map[string]*template.Template{}
 
-	// Find all files with the pattern "*.page.tmpl" inside the ./templates directory
+	// Search the templates directory for page template files with .page.tmpl extension
 	pages, err := filepath.Glob("./templates/*.page.tmpl")
 	if err != nil {
-		return myCache, err
+		return myCache, err // Return current cache and error if file glob fails
 	}
 
-	// Loop through every file found
+	// Iterate over each page template file found
 	for _, page := range pages {
-		// Extract only the file name (without path)
+		// Extract the base filename (without directory) to use as template name
 		name := filepath.Base(page)
 
-		// Create a new template with that name and parse the main page template
+		// Create a new template with the extracted name and parse the page file into it
 		ts, err := template.New(name).ParseFiles(page)
 		if err != nil {
-			return myCache, err
+			return myCache, err // Return error if page parsing fails
 		}
 
-		// Find all layout templates, typically used for wrapping pages
+		// Search for layout templates with .layout.tmpl extension used for page wrapping
 		matches, err := filepath.Glob("./templates/*.layout.tmpl")
 		if err != nil {
-			return myCache, err
+			return myCache, err // Return error if layout glob fails
 		}
 
-		// If layout templates exist, parse and associate them with the page template
+		// If layout templates are found, parse and associate them with the current page template
 		if len(matches) > 0 {
 			ts, err = ts.ParseGlob("./templates/*.layout.tmpl")
 			if err != nil {
-				return myCache, err
+				return myCache, err // Return error if layout parsing fails
 			}
 		}
 
-		// Save the compiled template set to the cache map
+		// Save the fully parsed and associated template set in the cache by filename
 		myCache[name] = ts
 	}
 
-	// Return the cache map and nil error
+	// Return the completed template cache map with no error
 	return myCache, nil
 }
