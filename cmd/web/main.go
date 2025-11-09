@@ -4,14 +4,29 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/KiroLakestrike/bedAndBreakfast/pkg/config"
 	"github.com/KiroLakestrike/bedAndBreakfast/pkg/handlers"
 	"github.com/KiroLakestrike/bedAndBreakfast/pkg/render"
+	"github.com/alexedwards/scs/v2"
 )
 
+var app config.AppConfig
+var session *scs.SessionManager
+
 func main() {
-	var app config.AppConfig
+
+	// Change this to true when in PRoduction
+	app.InProduction = false
+
+	session = scs.New()
+	session.Lifetime = 24 * time.Hour
+	session.Cookie.Persist = true
+	session.Cookie.SameSite = http.SameSiteLaxMode
+	session.Cookie.Secure = app.InProduction
+
+	app.Session = session
 
 	tc, err := render.CreateTemplateCache()
 	if err != nil {
