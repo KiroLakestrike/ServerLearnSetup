@@ -2,20 +2,27 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 )
 
+const PortNumber = ":8080"
+
+// Handler for our Home page
+func Home(w http.ResponseWriter, r *http.Request) {
+
+}
+
+// Handler for our About page
+func About(w http.ResponseWriter, r *http.Request) {
+
+}
+
 func main() {
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		n, err := fmt.Fprintf(w, "Hello World")
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println(fmt.Sprintf("Bytes written: %d", n))
-	})
+	// Handlers
+	http.HandleFunc("/", Home)
+	http.HandleFunc("/about", About)
 
-	fmt.Println("Listening on http://localhost:8080")
-	_ = http.ListenAndServe(":8080", nil)
+	fmt.Println(fmt.Sprintf("Listening on http://localhost%v", PortNumber))
+	_ = http.ListenAndServe(PortNumber, nil)
 }
