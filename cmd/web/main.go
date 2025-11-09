@@ -2,19 +2,40 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
+	"github.com/KiroLakestrike/bedAndBreakfast/pkg/config"
 	"github.com/KiroLakestrike/bedAndBreakfast/pkg/handlers"
+	"github.com/KiroLakestrike/bedAndBreakfast/pkg/render"
 )
 
-const PortNumber = ":8080"
-
 func main() {
+	var app config.AppConfig
 
-	// Handlers
-	http.HandleFunc("/", handlers.Home)
-	http.HandleFunc("/about", handlers.About)
+	tc, err := render.CreateTemplateCache()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	fmt.Println(fmt.Sprintf("Listening on http://localhost%v", PortNumber))
-	_ = http.ListenAndServe(PortNumber, nil)
+	app.TemplateCache = tc
+	app.UseCache = false
+	app.PortNumber = ":8080"
+
+	repo := handlers.NewRepo(&app)
+	handlers.NewHandlers(repo)
+
+	render.NewTemplates(&app)
+
+	// Load Handlers
+	srv := &http.Server{
+		Addr:    app.PortNumber,
+		Handler: routes(&app),
+	}
+
+	fmt.Println(fmt.Sprintf("Listening on http://localhost%v", app.PortNumber))
+	err = srv.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
